@@ -1,7 +1,7 @@
 // Séquenceur de pince : mode hors ligne.
 // Pour publier une nouvelle version de l'appli, change le numéro ci-dessous (v1 -> v2...).
-const CACHE = 'seqbois-v1';
-const FILES = ['./', './index.html', './manifest.json',
+const CACHE = 'seqbois-v3';
+const FILES = ['./', './index.html', './manifest.json', './mode-emploi.html',
   './icon-180.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 // false = test sans les polices Google (repli sur la police du téléphone hors ligne).

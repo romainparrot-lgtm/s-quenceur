@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mode d’emploi – Séquenceur de pince</title>
+<style>
+:root{--bg:#f6f4f1;--card:#fff;--tx:#1b1e21;--mut:#5d656c;--line:#e0dcd6;--acc:#d9560f;--accbg:#fdeee4;--tip:#eef4f7;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171A;--card:#1C2024;--tx:#eceef0;--mut:#9aa3aa;--line:#2C3237;--acc:#ff8a16;--accbg:#2a2018;--tip:#1a2630}}
+:root[data-theme="dark"]{--bg:#14171A;--card:#1C2024;--tx:#eceef0;--mut:#9aa3aa;--line:#2C3237;--acc:#ff8a16;--accbg:#2a2018;--tip:#1a2630}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:22px;margin:8px 0 4px}
+.sub{color:var(--mut);margin:0 0 16px;font-size:14px}
+.switch{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin-bottom:16px}
+.switch button{flex:1;border:0;background:transparent;color:var(--mut);font:600 14px inherit;font-family:inherit;padding:11px 8px;border-radius:10px;cursor:pointer}
+.switch button[aria-pressed="true"]{background:var(--acc);color:#fff}
+section{display:none}
+section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 14px}
+h2{font-size:17px;margin:0 0 8px;color:var(--acc)}
+h3{font-size:15px;margin:14px 0 4px}
+p{margin:6px 0}
+ol,ul{margin:6px 0;padding-left:22px}
+li{margin:4px 0}
+.tip{background:var(--tip);border-radius:10px;padding:9px 12px;font-size:14px;margin:10px 0 2px}
+.btn{display:inline-block;background:var(--accbg);color:var(--acc);border-radius:7px;padding:1px 7px;font-weight:600;font-size:14px;white-space:nowrap}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
+code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px}
+</style>
+</head>
+<body>
+<main>
+<h1>Mode d’emploi</h1>
+<p class="sub">Séquenceur de pince – planification perçage / coupe</p>
+
+<div class="switch" role="group" aria-label="Choix du mode d’emploi">
+  <button id="b-calc" aria-pressed="true">Calculs seulement</button>
+  <button id="b-full" aria-pressed="false">Complet</button>
+</div>
+
+<!-- ============ MODE CALCULS SEULEMENT ============ -->
+<section id="calcs" class="on">
+<div class="card">
+<h2>L’essentiel en 4 temps</h2>
+<p>Ce mode suffit pour obtenir la séquence de la pince. Pas besoin du stock ni des chantiers.</p>
+</div>
+
+<div class="card">
+<h2>1. Décrire la pièce</h2>
+<p>Ouvrez l’appli : vous êtes sur l’onglet <span class="btn">1 Coupes</span>.</p>
+<ol>
+<li><b>Chute de tête</b> : laissez 20 mm (distance entre le bord brut de la planche et la coupe de départ), sauf besoin particulier.</li>
+<li>Appuyez sur <span class="btn">Ajouter une étape</span> pour chaque opération de la pièce, dans l’ordre.</li>
+<li>Sur chaque ligne, tapez la <b>distance en mm</b> et choisissez l’action : <b>1 trou</b>, <b>2 trous</b> ou <b>Couper</b>.</li>
+</ol>
+<p><b>Quelle distance ?</b> Pour la première ligne : du début de la planche jusqu’au premier perçage. Ensuite : l’entraxe depuis l’opération précédente.</p>
+<div class="tip">Terminez <b>toujours</b> la pièce par une ligne « Couper ». Un aperçu dessiné se met à jour sous les lignes pour vérifier d’un coup d’œil.</div>
+</div>
+
+<div class="card">
+<h2>2. Passer à la séquence</h2>
+<p>Appuyez deux fois sur <span class="btn">Suivant →</span> (en bas) pour sauter l’onglet Optimisation, jusqu’à <span class="btn">3 Séquence</span>. Puis appuyez sur <span class="btn">Calculer la séquence</span>.</p>
+<p>Si la longueur de la planche n’est pas connue, un message vous la demande : tapez-la en mm (ex. 5000) et validez avec le petit bouton à côté de la case.</p>
+</div>
+
+<div class="card">
+<h2>3. Lire le résultat</h2>
+<p>Le tableau se lit ligne par ligne, <b>de haut en bas</b> :</p>
+<div class="tbl"><table>
+<tr><th>Colonne</th><th>Sens</th></tr>
+<tr><td>Étape</td><td>Numéro de l’opération.</td></tr>
+<tr><td>Avancer de</td><td>De combien la pince fait avancer la planche.</td></tr>
+<tr><td>Puis</td><td>Ce que fait la machine : 1 trou, 2 trous, Couper.</td></tr>
+<tr><td>Position</td><td>Position cumulée sur la planche (mm).</td></tr>
+</table></div>
+<p>Au-dessus, un résumé donne : <b>N. pièce</b> (nombre placé), <b>Consommée</b> (mm) et <b>Chute finale</b> (mm). Un schéma de la planche et sa légende (drapeau = coupe de départ) aident à contrôler.</p>
+<div class="tip">Un bandeau « Attention » signale les pièces qui ne rentrent pas dans la planche : il faudra les prévoir sur une autre.</div>
+</div>
+
+<div class="card">
+<h2>4. Ajuster si besoin</h2>
+<ul>
+<li>Dans <b>Optimiser les pièces</b>, touchez la longueur de planche pour la modifier, ou changez le nombre de pièces par planche, puis <span class="btn">Calculer l’optimisation</span>.</li>
+<li>Si le résultat semble faux, vérifiez d’abord les <b>Réglages</b> (engrenage) : voir la page « Complet ».</li>
+</ul>
+</div>
+</section>
+
+<!-- ============ MODE COMPLET ============ -->
+<section id="complet">
+<div class="card">
+<h2>Vue d’ensemble</h2>
+<p>L’appli suit 3 étapes affichées en haut : <b>1 Coupes</b>, <b>2 Optim.</b>, <b>3 Séquence</b>. Les boutons <span class="btn">← Précédent</span> et <span class="btn">Suivant →</span> en bas permettent d’avancer. Sur la dernière étape, le bouton devient <span class="btn">Terminé ✓</span>, ou <span class="btn">Sortir du stock</span> si une planche du stock a été choisie.</p>
+<p>Deux boutons flottants restent accessibles depuis toutes les étapes : <b>Stock de planches</b> et <b>Réglages</b> (engrenage).</p>
+<div class="tip">Les données saisies sont gardées dans l’appareil, et l’appli fonctionne hors ligne une fois ouverte une première fois avec du réseau.</div>
+</div>
+
+<div class="card">
+<h2>Barre du chantier (en haut)</h2>
+<p>Elle sert à retrouver et enregistrer vos plans.</p>
+<ul>
+<li><b>Toucher la barre</b> : ouvre « Charger un plan ». Cherchez par nom ou numéro de chantier. Le bouton <b>+</b> crée un chantier (N° et nom).</li>
+<li><b>Icône d’enregistrement</b> : ouvre « Sauvegarder les pièces ». Choisissez <i>Nouveau chantier</i> ou <i>Chantier existant</i> (avec recherche), indiquez le <b>Programme</b> (3 chiffres max) et le <b>Numéro du plan</b>, puis <span class="btn">Sauvegarder ce plan</span>.</li>
+<li><b>Croix ✕</b> : ferme le chantier ouvert.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>1 / Coupes et perçages</h2>
+<ul>
+<li><b>Chute de tête</b> : distance depuis le bord brut (20 mm par défaut).</li>
+<li><b>Titre de la pièce</b> (facultatif) : apparaît ensuite dans l’optimisation. La croix ✕ à côté supprime la pièce (ou la remet à zéro s’il n’y en a qu’une), après confirmation.</li>
+<li><b>Séquence de la pièce</b> : lignes Distance + action (1 trou / 2 trous / Couper), à terminer par « Couper ». La croix ✕ de la ligne la supprime.</li>
+<li><span class="btn">Ajouter / Supprimer une pièce</span> : gère plusieurs types de pièces sur la même planche.</li>
+<li><span class="btn">Perçages optionnels</span> : perçages mesurés depuis la coupe de départ de la planche, non liés à une pièce. Bouton « Ajouter un perçage ».</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>2 / Optimisation</h2>
+<p>Cherche la planche du stock qui laisse le moins de chute.</p>
+<ol>
+<li><b>Matière</b> : filtre le stock (« Toutes » par défaut).</li>
+<li><b>Dimension complète</b> (facultatif) : précise épaisseur et largeur.</li>
+<li><b>Nombre de fois par planche</b> : combien de pièces de ce type sur une même planche.</li>
+<li><span class="btn">Trouver la planche avec le moins de chute</span>, puis <span class="btn">Utiliser la palette sélectionnée</span> : la longueur de planche est alors reprise pour le calcul.</li>
+</ol>
+</div>
+
+<div class="card">
+<h2>3 / Séquençage</h2>
+<ul>
+<li><span class="btn">Calculer la séquence</span> : produit le résumé, le schéma et le tableau (voir mode « Calculs seulement »).</li>
+<li><b>3.1 Optimiser les pièces</b> : touchez la longueur de planche pour la changer (le stock devra alors être mis à jour à la main), réglez la quantité de chaque pièce (« max » = maximum possible seule), puis <span class="btn">Calculer l’optimisation</span>. La séquence se recalcule.</li>
+<li><b>Longueur recommandée</b> : longueur de planche conseillée pour ce projet.</li>
+<li><span class="btn">Partager</span> : ouvre le menu de partage du téléphone (envoi, impression / export PDF).</li>
+<li><span class="btn">Sortir du stock</span> (dernière étape) : retire du stock la planche utilisée.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Stock de planches</h2>
+<ul>
+<li><b>Importer</b> un fichier Excel / CSV, ou <b>Exporter en Excel (.xlsx)</b>.</li>
+<li><b>Comparer 2 fichiers Excel</b> : détecte les écarts entre votre stock et un fichier mis à jour, pour éviter les erreurs de sortie.</li>
+<li><b>Affichage</b> : « Regrouper par matière », « Vue à plat », ou « Vue Excel » en fenêtre.</li>
+<li><b>Rechercher</b> une planche par code.</li>
+<li>Sur chaque ligne : <b>−1</b> retire une planche, <b>×</b> supprime la ligne.</li>
+<li><span class="btn">Ajouter une planche au stock</span> : identifiant, matière, n° de commande, fournisseur, longueur, épaisseur, largeur, quantité.</li>
+<li><span class="btn">Réinitialiser le suivi</span> (nouvelle semaine) : à faire une fois le fichier envoyé. Supprime les planches à 0 et enlève les couleurs orange / rouge (les quantités actuelles deviennent la nouvelle référence).</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Réglages (engrenage)</h2>
+<p>À régler une fois pour la machine :</p>
+<div class="tbl"><table>
+<tr><th>Réglage</th><th>Valeur d’origine</th></tr>
+<tr><td>Pince (position 0) → perçage 1 trou</td><td>387,8 mm</td></tr>
+<tr><td>Perçage 1 trou → perçage 2 trous</td><td>200,2 mm</td></tr>
+<tr><td>Perçage 2 trous → scie</td><td>476,2 mm</td></tr>
+<tr><td>Course maximale de la pince par prise</td><td>900 mm</td></tr>
+<tr><td>Trait de scie (épaisseur de lame)</td><td>5 mm</td></tr>
+<tr><td>Chute minimale exploitable</td><td>60 mm</td></tr>
+</table></div>
+<p>Si une chute est plus petite que la <b>chute minimale</b>, elle n’est pas récupérable : l’outil retire alors la dernière pièce pour laisser une chute nulle ou assez grande. <span class="btn">Réinitialiser les réglages d’origine</span> remet ces valeurs.</p>
+<h3>Projet importé</h3>
+<p><b>Nom du projet</b> = nom du fichier lors du partage. <b>Importer</b> charge un fichier de projet (.json, .html, .txt) et <b>remplace</b> les pièces et perçages actuels.</p>
+</div>
+
+<div class="card">
+<h2>Installer l’appli</h2>
+<ul>
+<li><b>iPhone (Safari)</b> : Partager, puis « Sur l’écran d’accueil ».</li>
+<li><b>Android (Chrome)</b> : menu ⋮, puis « Installer l’application ».</li>
+</ul>
+<p>Ouvrez-la une première fois avec du réseau : ensuite elle marche sans connexion.</p>
+</div>
+</section>
+</main>
+<script>
+(function(){
+  if(window.self!==window.top) document.documentElement.setAttribute('data-theme','dark');
+  var secs={calcs:document.getElementById('calcs'),complet:document.getElementById('complet')};
+  var bc=document.getElementById('b-calc'),bf=document.getElementById('b-full');
+  function show(k){
+    secs.calcs.classList.toggle('on',k==='calcs');
+    secs.complet.classList.toggle('on',k==='complet');
+    bc.setAttribute('aria-pressed',k==='calcs');
+    bf.setAttribute('aria-pressed',k==='complet');
+    window.scrollTo(0,0);
+  }
+  bc.onclick=function(){show('calcs')};
+  bf.onclick=function(){show('complet')};
+  if(location.hash==='#complet')show('complet');
+})();
+</script>
+</body>
+</html>
