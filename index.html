@@ -6539,6 +6539,11 @@ document.getElementById('importChantiersInput').addEventListener('change', funct
   });
 });
 
+/* Cle stricte : deux lignes du meme code mais de dimensions/commande differentes restent distinctes. */
+function seqLockKey(s){
+  return [stockCompareKey(s), s.id || '', s.matiere || '', s.codeOriginal || '', s.designation || '', s.commande || '', s.fournisseur || '',
+    s.epaisseur != null ? s.epaisseur : '', s.largeur != null ? s.largeur : '', (s.longueur != null && !isNaN(s.longueur)) ? s.longueur : ''].join('~');
+}
 document.getElementById('importLockedStockBtn').addEventListener('click', function(){
   document.getElementById('importLockedStockInput').click();
 });
@@ -6563,26 +6568,27 @@ document.getElementById('importLockedStockInput').addEventListener('change', fun
     }
     const current = collectStockList();
     const lockedKeys = {};
-    current.forEach(function(s){ if (s.locked) lockedKeys[stockCompareKey(s)] = true; });
+    current.forEach(function(s){ if (s.locked) lockedKeys[seqLockKey(s)] = true; });
     // Lignes du fichier : on ignore celles deja presentes ET protegees dans le stock actuel.
     const incoming = [];
     const incomingKeys = {};
-    let skipped = 0;
+    let skipped = 0, dupFile = 0;
     data.lignes.forEach(function(l){
       if (!l || typeof l !== 'object'){ skipped++; return; }
-      const k = stockCompareKey(l);
-      if (lockedKeys[k] || incomingKeys[k]){ skipped++; return; }
+      const k = seqLockKey(l);
+      if (lockedKeys[k]){ skipped++; return; }
+      if (incomingKeys[k]){ dupFile++; return; }
       incomingKeys[k] = true;
       incoming.push(plain(l, true, false));
     });
     if (!incoming.length){
-      seqFlashBtn(btn, 'Rien à importer (' + skipped + ' déjà présente(s))');
+      seqFlashBtn(btn, 'Rien à importer (' + skipped + ' déjà protégée(s) dans le stock, ' + dupFile + ' doublon(s) dans le fichier)');
       return;
     }
     // Une ligne non protegee du stock actuel identique a une ligne du fichier est remplacee par la version protegee.
     let replaced = 0;
     const kept = current.filter(function(s){
-      if (!s.locked && incomingKeys[stockCompareKey(s)]){ replaced++; return false; }
+      if (!s.locked && incomingKeys[seqLockKey(s)]){ replaced++; return false; }
       return true;
     }).map(function(s){ return plain(s, s.locked, true); });
     stockList.innerHTML = '';
@@ -6592,7 +6598,8 @@ document.getElementById('importLockedStockInput').addEventListener('change', fun
     else applyStockSearch();
     let msg = '✓ ' + incoming.length + ' ligne(s) protégée(s) importée(s)';
     if (replaced) msg += ', ' + replaced + ' remplacée(s)';
-    if (skipped) msg += ', ' + skipped + ' déjà présente(s)';
+    if (skipped) msg += ', ' + skipped + ' déjà protégée(s) dans le stock';
+    if (dupFile) msg += ', ' + dupFile + ' doublon(s) identique(s) dans le fichier';
     seqFlashBtn(btn, msg);
   });
 });
