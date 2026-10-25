@@ -2202,6 +2202,11 @@ table.steps tr.coupe td.label .ic{ filter:none; }
         <div class="stock-import-row" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
           <button type="button" class="add small secondary" id="compareStockBtn" style="flex:1; min-width:150px;">🔍 Comparer 2 fichiers Excel</button>
         </div>
+        <div class="stock-import-row" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+          <input type="file" id="importLockedStockInput" accept=".json,application/json" style="display:none;">
+          <button type="button" class="add small secondary" id="exportLockedStockBtn" style="flex:1; min-width:150px;">🔒 Exporter les lignes protégées (fichier spécial)</button>
+          <button type="button" class="add small secondary" id="importLockedStockBtn" style="flex:1; min-width:150px;">🔒 Importer des lignes protégées (fichier spécial)</button>
+        </div>
         <div class="hint" style="margin:-4px 0 14px;">En comparant votre stock actuel à un fichier de stock mis à jour, cet outil détecte automatiquement les écarts et vous évite des erreurs lors des sorties.</div>
         <div class="stock-view-toggle">
           <button type="button" class="add small" id="stockGroupBtn" style="flex:1; min-width:150px;">Regrouper par matière</button>
@@ -2326,6 +2331,11 @@ table.steps tr.coupe td.label .ic{ filter:none; }
             <input type="text" id="chantierSearchInput" placeholder="ex. Dupont ou 04">
           </div>
           <div id="dossiersList"></div>
+          <input type="file" id="importChantiersInput" accept=".json,application/json" style="display:none;">
+          <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+            <button type="button" class="add small secondary" id="exportChantiersBtn" style="flex:1; min-width:140px;">Exporter tous les chantiers (fichier)</button>
+            <button type="button" class="add small secondary" id="importChantiersBtn" style="flex:1; min-width:140px;">Importer des chantiers (fichier)</button>
+          </div>
         </div>
       </div>
 
@@ -6369,6 +6379,222 @@ document.getElementById('exportStockXlsxBtn').addEventListener('click', async fu
   }
 
   xlsxDownloadViaDataUri(bytes, fname);
+});
+
+/* ---------- EXPORTS JSON : chantiers sauvegardes + lignes de stock protegees ---------- */
+function seqDateStamp(){
+  const d = new Date();
+  function p(n){ return (n < 10 ? '0' : '') + n; }
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function seqReadListLS(key){
+  try{ const d = JSON.parse(localStorage.getItem(key) || 'null'); return Array.isArray(d) ? d : []; } catch(e){ return []; }
+}
+function seqDownloadText(text, fname){
+  try{
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  } catch(e){
+    const a = document.createElement('a');
+    a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(text);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+}
+/* Meme logique que l export Excel : partage natif en priorite (evite les
+   blocages de telechargement dans les webviews), sinon telechargement. */
+function seqSaveJsonFile(obj, fname){
+  const text = JSON.stringify(obj, null, 2);
+  let file = null;
+  try{ file = new File([text], fname, { type: 'application/json' }); } catch(e){ file = null; }
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file] }).catch(function(err){
+      if (err && err.name === 'AbortError') return;
+      seqDownloadText(text, fname);
+    });
+    return;
+  }
+  seqDownloadText(text, fname);
+}
+function seqFlashBtn(btn, msg){
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.textContent = msg;
+  clearTimeout(btn._flashT);
+  btn._flashT = setTimeout(function(){ btn.textContent = btn.dataset.label; }, 2600);
+}
+
+document.getElementById('exportChantiersBtn').addEventListener('click', function(){
+  const chantiers = seqReadListLS('seqBoisChantiersV1');
+  const dossiers = seqReadListLS('seqBoisDossiersV1');
+  if (!chantiers.length && !dossiers.length){
+    seqFlashBtn(this, 'Aucun chantier sauvegardé à exporter');
+    return;
+  }
+  seqSaveJsonFile({
+    type: 'sequenceur-bit-bois-chantiers',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    dossiers: dossiers,
+    chantiers: chantiers
+  }, 'chantiers_sequenceur_' + seqDateStamp() + '.json');
+  seqFlashBtn(this, '✓ ' + chantiers.length + ' plan(s) exporté(s)');
+});
+
+document.getElementById('exportLockedStockBtn').addEventListener('click', function(){
+  const lignes = collectStockList().filter(function(s){ return s.locked; }).map(function(s){
+    return {
+      id: s.id, matiere: s.matiere, longueur: s.longueur, epaisseur: s.epaisseur, largeur: s.largeur, qty: s.qty,
+      designation: s.designation, commande: s.commande, attribution: s.attribution,
+      fournisseur: s.fournisseur, codeOriginal: s.codeOriginal, imported: s.imported, locked: true,
+      qtyBaseline: s.qtyBaseline, xlRow: s.xlRow
+    };
+  });
+  if (!lignes.length){
+    seqFlashBtn(this, 'Aucune ligne protégée dans le stock');
+    return;
+  }
+  seqSaveJsonFile({
+    type: 'sequenceur-bit-bois-stock-protege',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    count: lignes.length,
+    lignes: lignes
+  }, 'stock_lignes_protegees_' + seqDateStamp() + '.json');
+  seqFlashBtn(this, '✓ ' + lignes.length + ' ligne(s) protégée(s) exportée(s)');
+});
+
+/* ---------- IMPORTS JSON : chantiers + lignes de stock protegees ---------- */
+function seqReadJsonFile(file, cb){
+  const reader = new FileReader();
+  reader.onload = function(){
+    let data = null;
+    try{ data = JSON.parse(String(reader.result || '').replace(/^\uFEFF/, '')); } catch(e){ data = null; }
+    cb(data);
+  };
+  reader.onerror = function(){ cb(null); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+document.getElementById('importChantiersBtn').addEventListener('click', function(){
+  document.getElementById('importChantiersInput').click();
+});
+document.getElementById('importChantiersInput').addEventListener('change', function(ev){
+  const input = ev.target;
+  const file = input.files && input.files[0];
+  const btn = document.getElementById('importChantiersBtn');
+  if (!file) return;
+  seqReadJsonFile(file, function(data){
+    input.value = '';
+    if (!data || data.type !== 'sequenceur-bit-bois-chantiers' || !Array.isArray(data.chantiers)){
+      seqFlashBtn(btn, 'Fichier non reconnu (chantiers)');
+      return;
+    }
+    const list = seqReadListLS('seqBoisChantiersV1');
+    function sig(c){ return [c.numero || '', c.plan || '', c.programme || '', c.savedAt || ''].join('|'); }
+    const known = {};
+    list.forEach(function(c){ if (c) known[sig(c)] = true; });
+    const usedProg = {};
+    list.forEach(function(c){
+      const n = normalizeProgrammeValue(c && c.programme);
+      if (n !== null) usedProg[n] = true;
+    });
+    let added = 0, skipped = 0, progReset = 0;
+    data.chantiers.forEach(function(c){
+      if (!c || typeof c !== 'object' || !Array.isArray(c.pieces)){ skipped++; return; }
+      if (known[sig(c)]){ skipped++; return; }
+      const copy = Object.assign({}, c);
+      const n = normalizeProgrammeValue(copy.programme);
+      if (n !== null){
+        if (usedProg[n]){ copy.programme = '00'; progReset++; }
+        else usedProg[n] = true;
+      }
+      known[sig(c)] = true;
+      list.push(copy);
+      added++;
+    });
+    saveChantiersList(list);
+    // Registre des chantiers : on ajoute les numeros manquants sans toucher aux noms existants.
+    const regs = seqReadListLS('seqBoisDossiersV1');
+    const haveNum = {};
+    regs.forEach(function(d){ if (d) haveNum[d.numero] = true; });
+    (Array.isArray(data.dossiers) ? data.dossiers : []).forEach(function(d){
+      if (d && d.numero != null && !haveNum[d.numero]){ regs.push({ numero: d.numero, nom: d.nom || '' }); haveNum[d.numero] = true; }
+    });
+    try{ localStorage.setItem('seqBoisDossiersV1', JSON.stringify(regs)); } catch(e){}
+    if (typeof renderChantiersList === 'function') renderChantiersList();
+    if (typeof renderProgrammeOccupancyInfo === 'function') renderProgrammeOccupancyInfo();
+    let msg = '✓ ' + added + ' plan(s) ajouté(s)';
+    if (skipped) msg += ', ' + skipped + ' déjà présent(s)';
+    if (progReset) msg += ', ' + progReset + ' programme(s) remis à 00 (numéro déjà pris)';
+    seqFlashBtn(btn, msg);
+  });
+});
+
+document.getElementById('importLockedStockBtn').addEventListener('click', function(){
+  document.getElementById('importLockedStockInput').click();
+});
+document.getElementById('importLockedStockInput').addEventListener('change', function(ev){
+  const input = ev.target;
+  const file = input.files && input.files[0];
+  const btn = document.getElementById('importLockedStockBtn');
+  if (!file) return;
+  seqReadJsonFile(file, function(data){
+    input.value = '';
+    if (!data || data.type !== 'sequenceur-bit-bois-stock-protege' || !Array.isArray(data.lignes)){
+      seqFlashBtn(btn, 'Fichier non reconnu (lignes protégées)');
+      return;
+    }
+    function plain(s, locked, keepRow){
+      return {
+        id: s.id, matiere: s.matiere, longueur: s.longueur, epaisseur: s.epaisseur, largeur: s.largeur, qty: s.qty,
+        designation: s.designation, commande: s.commande, attribution: s.attribution, fournisseur: s.fournisseur,
+        codeOriginal: s.codeOriginal, imported: s.imported, qtyBaseline: s.qtyBaseline,
+        xlRow: keepRow ? s.xlRow : null, locked: locked
+      };
+    }
+    const current = collectStockList();
+    const lockedKeys = {};
+    current.forEach(function(s){ if (s.locked) lockedKeys[stockCompareKey(s)] = true; });
+    // Lignes du fichier : on ignore celles deja presentes ET protegees dans le stock actuel.
+    const incoming = [];
+    const incomingKeys = {};
+    let skipped = 0;
+    data.lignes.forEach(function(l){
+      if (!l || typeof l !== 'object'){ skipped++; return; }
+      const k = stockCompareKey(l);
+      if (lockedKeys[k] || incomingKeys[k]){ skipped++; return; }
+      incomingKeys[k] = true;
+      incoming.push(plain(l, true, false));
+    });
+    if (!incoming.length){
+      seqFlashBtn(btn, 'Rien à importer (' + skipped + ' déjà présente(s))');
+      return;
+    }
+    // Une ligne non protegee du stock actuel identique a une ligne du fichier est remplacee par la version protegee.
+    let replaced = 0;
+    const kept = current.filter(function(s){
+      if (!s.locked && incomingKeys[stockCompareKey(s)]){ replaced++; return false; }
+      return true;
+    }).map(function(s){ return plain(s, s.locked, true); });
+    stockList.innerHTML = '';
+    kept.concat(incoming).forEach(function(s){ stockList.appendChild(makeStockRow(s)); });
+    saveStock();
+    if (stockViewMode === 'grouped') renderStockGrouped();
+    else applyStockSearch();
+    let msg = '✓ ' + incoming.length + ' ligne(s) protégée(s) importée(s)';
+    if (replaced) msg += ', ' + replaced + ' remplacée(s)';
+    if (skipped) msg += ', ' + skipped + ' déjà présente(s)';
+    seqFlashBtn(btn, msg);
+  });
 });
 
 /* Collecte simplifiee des pieces (section 04) pour l evaluation du stock :
