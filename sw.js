@@ -1,6 +1,7 @@
 // Séquenceur de pince : mode hors ligne.
-// Pour publier une nouvelle version de l'appli, change le numéro ci-dessous (v1 -> v2...).
-const CACHE = 'seqbois-v5';
+// Pour publier une nouvelle version de l'appli, change le numéro ci-dessous (v6 -> v7...).
+// Tant que ce numéro ne change pas, l'appli ne retélécharge rien : tout vient du téléphone.
+const CACHE = 'seqbois-v6';
 const FILES = ['./', './index.html', './manifest.json', './mode-emploi.html',
   './icon-180.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
@@ -9,7 +10,12 @@ const FILES = ['./', './index.html', './manifest.json', './mode-emploi.html',
 const CACHE_FONTS = false;
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache:'reload' = on récupère bien la version fraîche sur le serveur, pas une copie du navigateur.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.all(FILES.map(f => c.add(new Request(f, { cache: 'reload' })))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -20,6 +26,7 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Cache d'abord : si le fichier est dans le téléphone, on le sert sans aucun accès réseau.
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -30,15 +37,14 @@ self.addEventListener('fetch', e => {
 
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => {
-      const refresh = fetch(req).then(res => {
+      if (hit) return hit;
+      return fetch(req).then(res => {
         if (res && (res.ok || res.type === 'opaque')) {
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put(req, copy));
         }
         return res;
-      }).catch(() => hit || caches.match('./index.html'));
-      e.waitUntil(refresh.catch(() => {}));
-      return hit || refresh;
+      }).catch(() => caches.match('./index.html'));
     })
   );
 });
