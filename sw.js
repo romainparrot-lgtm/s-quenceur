@@ -1,7 +1,7 @@
 // Séquenceur de pince : mode hors ligne.
 // Pour publier une nouvelle version de l'appli, change le numéro ci-dessous (v6 -> v7...).
 // Tant que ce numéro ne change pas, l'appli ne retélécharge rien : tout vient du téléphone.
-const CACHE = 'seqbois-v7';
+const CACHE = 'seqbois-v8';
 const FILES = ['./', './index.html', './manifest.json', './mode-emploi.html',
   './icon-180.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
