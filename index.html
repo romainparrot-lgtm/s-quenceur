@@ -2364,7 +2364,7 @@ table.steps tr.coupe td.label .ic{ filter:none; }
         <div class="sub">Indiquez la distance depuis le début de la planche jusqu'au premier perçage, puis l'entraxe jusqu'au suivant à chaque nouvelle ligne (simple ou double). Répétez autant de fois que nécessaire, et terminez toujours par « Couper » : la longueur de la pièce est alors calculée automatiquement.</div>
         <div class="field" style="margin-bottom:14px;">
           <label>Chute de tête / coupe de départ (mm)</label>
-          <input type="number" id="chutetete" value="20" step="0.1">
+          <input type="number" id="chutetete" value="50" step="0.1">
           <div class="hint">Depuis le bord brut de la planche.</div>
         </div>
         <div id="pieceBlocks"></div>
@@ -3649,12 +3649,12 @@ function applyPlanTitles(){
 function getChuteTeteForSave(){
   const el = document.getElementById('chutetete');
   const v = el ? parseFloat(String(el.value).replace(',', '.')) : NaN;
-  return isNaN(v) ? 20 : v;
+  return isNaN(v) ? 50 : v;
 }
 function applyChuteTete(v){
   const el = document.getElementById('chutetete');
   if (!el) return;
-  el.value = (v != null && !isNaN(v)) ? v : 20;
+  el.value = (v != null && !isNaN(v)) ? v : 50;
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -3776,7 +3776,7 @@ document.getElementById('dossierCloseBtn').addEventListener('click', function(){
       pieceBlocks.innerHTML = '';
       pieceBlocks.appendChild(makePieceBlock());
       savePiecesState();
-      applyChuteTete(20);
+      applyChuteTete(50);
       window.activeDossier = null;
       window.activePlanNum = '';
       window.plansCollapsed = false;
@@ -7658,7 +7658,7 @@ function buildOptimizerPanel(result, cfg, summaryHtml){
     '<div class="optimizer-board optimizer-board-editable" id="optimizerBoardLength" role="button" tabindex="0" title="Cliquer pour modifier">Longueur de la planche <strong id="optBoardLengthValue">' + fmt(board) + ' mm</strong></div>' +
     '<div class="optimizer-list">' + items + '</div>' +
     (summaryHtml || '') +
-    (result.cutResult ? '<div class="optimizer-board">Longueur recommandée <strong id="optSummaryRecommended">' + fmt((result.cutResult.unplaced && result.cutResult.unplaced.length > 0) ? result.cutResult.requiredLength : (board - result.cutResult.finalChute)) + ' mm</strong></div>' : '') +
+    (result.cutResult ? '<div class="optimizer-board">Longueur recommandée <strong id="optSummaryRecommended">' + fmt(((result.cutResult.unplaced && result.cutResult.unplaced.length > 0) ? result.cutResult.requiredLength : (board - result.cutResult.finalChute)) + (cfg.minChute || 0)) + ' mm</strong></div>' : '') +
     '<div class="optimizer-actions"><button type="button" class="optimizer-btn" id="runOptimizer">Calculer l’optimisation</button></div>' +
     '<div class="optimizer-result" id="optimizerResult"></div>' +
   '</div>';
@@ -7815,6 +7815,9 @@ function updateOptimizerLiveSummary(){
      la longueur totale necessaire pour tout faire rentrer (used theorique) ;
      sinon la longueur reellement consommee par ce qui a pu etre place. */
   var recommended = insufficient ? requestedUsed : used;
+  /* + chute de fin minimale (section 02) : chute de tête + longueur utile
+     (pièces + traits de scie) + chute de fin. Rien à recommander sans pièce. */
+  if (recommended > 0) recommended += minChute;
 
   var elCount = document.getElementById('optSummaryCount');
   var elUsed = document.getElementById('optSummaryUsed');
@@ -7958,6 +7961,8 @@ function renderResults(result, cfg){
       var recommendedLen = (result.cutResult.unplaced && result.cutResult.unplaced.length > 0)
         ? result.cutResult.requiredLength
         : (result.cutResult.boardLength - result.cutResult.finalChute);
+      /* + chute de fin minimale (section 02) : chute de tête + longueur utile + chute de fin */
+      recommendedLen += (cfg.minChute || 0);
       html += '<div class="optimizer-board">Longueur recommandée <strong>' + fmt(recommendedLen) + ' mm</strong></div>';
     }
   }
