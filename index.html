@@ -7659,7 +7659,7 @@ function buildOptimizerPanel(result, cfg, summaryHtml){
     '<div class="optimizer-list">' + items + '</div>' +
     (summaryHtml || '') +
     (result.cutResult ? '<div class="optimizer-board">Longueur recommandée <strong id="optSummaryRecommended">' + fmt(((result.cutResult.unplaced && result.cutResult.unplaced.length > 0) ? result.cutResult.requiredLength : (board - result.cutResult.finalChute)) + (cfg.minChute || 0)) + ' mm</strong></div>' : '') +
-    '<div class="optimizer-actions"><button type="button" class="optimizer-btn" id="runOptimizer">Calculer l’optimisation</button></div>' +
+    (lastPieceTypesForOptimizer.length > 1 ? '<div class="optimizer-actions"><button type="button" class="optimizer-btn" id="runOptimizer">Calculer l’optimisation</button></div>' : '') +
     '<div class="optimizer-result" id="optimizerResult"></div>' +
   '</div>';
 }
@@ -12488,6 +12488,286 @@ if ('serviceWorker' in navigator) {
   document.querySelectorAll('.help-fab').forEach(function(b){ b.addEventListener('click',open); });
   document.getElementById('helpOverlayClose').addEventListener('click',close);
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+})();
+</script>
+<script id="persist-results-tab3">
+/* =========================================================
+   SAUVEGARDE DES RESULTATS (onglet 3 + optimisation 3.1)
+   ---------------------------------------------------------
+   - A chaque calcul reussi, on memorise le contexte du calcul
+     (chute de tete, longueur de planche, trait de scie, chute
+     minimale, palette choisie). Les pieces (et leurs quantites,
+     y compris celles issues de l'optimisation) sont deja
+     sauvegardees par savePiecesState.
+   - A la reouverture, si les dimensions de l'onglet 1 n'ont pas
+     bouge, le calcul est relance tout seul avec ces memes valeurs :
+     on retrouve donc exactement le meme resultat (et le meme
+     panneau d'optimisation), toujours a jour des actions
+     1 trou / 2 trous.
+   - Remise a zero (resultats effaces + quantites ramenees a 1)
+     si on touche a la chute de tete, a une distance, ou si on
+     supprime une ligne / change une ligne en « Couper » (ce qui
+     modifie les dimensions). Passer de 1 trou a 2 trous ne remet
+     rien a zero.
+   ========================================================= */
+(function(){
+  var SNAP_KEY = 'seqBoisResultsSnapshotV1';
+  var CHUTE_KEY = 'seqBoisChuteTeteV1';
+  var resultsBody = document.getElementById('resultsBody');
+  var emptyHtml = resultsBody ? resultsBody.innerHTML : null;
+  var origSave = (typeof window.savePiecesState === 'function') ? window.savePiecesState : function(){};
+  var lastSig = null;
+  var userFlag = false;
+
+  function num(v){ var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; }
+
+  /* Empreinte des dimensions : chute de tete, distances des perçages
+     optionnels, et pour chaque piece la liste des distances (jusqu'a la
+     premiere coupe, avec repere « C » sur la ligne Couper). Le type
+     1 trou / 2 trous n'en fait pas partie. */
+  function sigNow(){
+    var parts = [];
+    var ct = num((document.getElementById('chutetete') || {}).value);
+    parts.push('T' + (ct === null ? '' : ct));
+    document.querySelectorAll('#holeList .op-row').forEach(function(row){
+      var d = row.querySelector('.hole-dist');
+      var v = d ? num(d.value) : null;
+      if (v !== null) parts.push('H' + v);
+    });
+    document.querySelectorAll('#pieceBlocks .piece-block').forEach(function(block){
+      var seg = [];
+      var rows = block.querySelectorAll('.piece-steps .op-row');
+      for (var i = 0; i < rows.length; i++){
+        var dEl = rows[i].querySelector('.step-dist');
+        var aEl = rows[i].querySelector('.step-action');
+        var n = dEl ? num(dEl.value) : null;
+        var isCut = aEl && aEl.value === 'coupe';
+        if (n !== null) seg.push(String(n) + (isCut ? 'C' : ''));
+        if (isCut) break;
+      }
+      parts.push('P[' + seg.join(',') + ']');
+    });
+    return parts.join('|');
+  }
+
+  function readSnap(){
+    try{ var o = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); return (o && o.v === 1) ? o : null; } catch(e){ return null; }
+  }
+  function writeSnap(o){
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify(o)); } catch(e){}
+  }
+  function dropSnap(){
+    try{ localStorage.removeItem(SNAP_KEY); } catch(e){}
+  }
+
+  function resetResults(resetQty){
+    dropSnap();
+    if (resultsBody && emptyHtml !== null) resultsBody.innerHTML = emptyHtml;
+    try{ lastPieceTypesForOptimizer = []; } catch(e){}
+    if (typeof clearWarn === 'function') clearWarn();
+    /* La longueur de planche (et la palette choisie pour elle) font partie
+       du resultat : on les efface aussi, elles ne sont pas conservees. */
+    var bl = document.getElementById('boardlen');
+    if (bl && bl.value !== ''){
+      bl.value = '';
+      try{
+        bl.dispatchEvent(new Event('input', { bubbles: true }));
+        bl.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch(e){}
+    }
+    window.wizardChosenStock = null;
+    if (typeof window.wizardRefreshNext === 'function') window.wizardRefreshNext();
+    if (resetQty){
+      document.querySelectorAll('#pieceBlocks .piece-qty').forEach(function(q){ q.value = 1; });
+      origSave();
+    }
+  }
+
+  function check(userEdit){
+    var s = sigNow();
+    if (lastSig === null){ lastSig = s; return; }
+    if (s === lastSig) return;
+    lastSig = s;
+    resetResults(!!userEdit);
+  }
+
+  /* Reperage des actions faites a la main sur les dimensions (par
+     opposition aux changements faits par le code, ex. chargement d'un plan,
+     qui ne doivent pas ecraser les quantites chargees). */
+  ['input', 'change', 'click'].forEach(function(t){
+    document.addEventListener(t, function(e){
+      if (!e.isTrusted) return;
+      var el = e.target;
+      if (!el || !el.matches) return;
+      var hit = false;
+      if (t === 'input' || t === 'change') hit = el.matches('.step-dist, .hole-dist, #chutetete') || (t === 'change' && el.matches('.step-action'));
+      if (t === 'click') hit = !!el.closest('#pieceBlocks .rm, #holeList .rm');
+      if (hit){ userFlag = true; setTimeout(function(){ userFlag = false; }, 0); }
+    }, true);
+  });
+
+  window.savePiecesState = function(){
+    var r = origSave.apply(this, arguments);
+    check(userFlag);
+    return r;
+  };
+
+  document.addEventListener('input', function(e){
+    var el = e.target;
+    if (!el || !el.matches) return;
+    if (el.id === 'chutetete'){
+      try{ localStorage.setItem(CHUTE_KEY, String(el.value)); } catch(err){}
+      check(userFlag || e.isTrusted);
+    } else if (el.matches('#holeList .hole-dist')){
+      check(userFlag || e.isTrusted);
+    }
+  });
+  document.addEventListener('change', function(e){
+    var el = e.target;
+    if (!el || !el.matches) return;
+    if (el.id === 'chutetete'){
+      try{ localStorage.setItem(CHUTE_KEY, String(el.value)); } catch(err){}
+      check(userFlag || e.isTrusted);
+    } else if (el.matches('#holeList .hole-dist, #holeList .hole-station')){
+      check(userFlag);
+    }
+  });
+  document.addEventListener('click', function(e){
+    var el = e.target;
+    if (!el || !el.closest) return;
+    if (el.closest('#holeList .rm')) check(userFlag);
+    if (el.closest('#calcBtn')) afterCalc();
+  });
+
+  /* Apres chaque calcul reussi : memorise le contexte + les quantites. */
+  function afterCalc(){
+    if (!document.querySelector('#resultsBody .diagram-wrap, #resultsBody .optimizer-panel')) return;
+    function val(id){ var el = document.getElementById(id); return el ? el.value : ''; }
+    var snap = {
+      v: 1, sig: sigNow(),
+      chutetete: val('chutetete'), boardlen: val('boardlen'), kerf: val('kerf'), minchute: val('minchute'),
+      chosen: window.wizardChosenStock || null, savedAt: Date.now()
+    };
+    lastSig = snap.sig;
+    writeSnap(snap);
+    origSave();
+  }
+
+  /* La palette peut etre sortie du stock : on ne la proposera plus ensuite. */
+  var origRefresh = window.wizardRefreshNext;
+  window.wizardRefreshNext = function(){
+    var r = (typeof origRefresh === 'function') ? origRefresh.apply(this, arguments) : undefined;
+    var snap = readSnap();
+    if (snap && snap.chosen && !window.wizardChosenStock){ snap.chosen = null; writeSnap(snap); }
+    return r;
+  };
+
+  /* ---------- CALCUL EN DIRECT ----------
+     Relance le calcul sans bruit (pas de message d'erreur, pas de
+     defilement, on reste sur l'onglet courant) quand une valeur change
+     et que des resultats sont deja affiches. */
+  var liveTimer = null;
+  function resultsShown(){ return !!document.querySelector('#resultsBody .diagram-wrap, #resultsBody .optimizer-panel'); }
+  function silentCalc(){
+    if (!resultsShown()) return;
+    var btn = document.getElementById('calcBtn');
+    if (!btn) return;
+    var stepBefore = (typeof window.wizardGetCurrentStep === 'function') ? window.wizardGetCurrentStep() : null;
+    var oScroll = window.scrollElementToViewportFraction;
+    var oErr = window.showError;
+    var oMove = window.moveBoardlenInputToError;
+    window.scrollElementToViewportFraction = function(){};
+    window.showError = function(){};
+    window.moveBoardlenInputToError = function(){};
+    try{ btn.click(); } catch(e){}
+    window.showError = oErr;
+    window.moveBoardlenInputToError = oMove;
+    setTimeout(function(){ window.scrollElementToViewportFraction = oScroll; }, 800);
+    if (stepBefore !== null && typeof window.wizardGoTo === 'function' && window.wizardGetCurrentStep() !== stepBefore){
+      window.wizardGoTo(stepBefore);
+    }
+  }
+  function scheduleLive(){
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(silentCalc, 150);
+  }
+  /* Panneau 3.1 : une quantite validee (Entree, ou on quitte le champ) est
+     reportee dans les pieces reelles puis le calcul est refait.
+     Pendant la frappe, le resume (nombre, chute, longueur recommandee)
+     se met deja a jour en direct. */
+  document.addEventListener('change', function(e){
+    var el = e.target;
+    if (!el || !el.matches || !e.isTrusted) return;
+    if (el.matches('[data-opt-qty]')){
+      var panel = document.getElementById('optimizerPanel');
+      if (!panel) return;
+      var blocks = document.querySelectorAll('#pieceBlocks .piece-block');
+      panel.querySelectorAll('[data-opt-qty]').forEach(function(inp){
+        var i = parseInt(inp.getAttribute('data-opt-qty'), 10);
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 0) v = 0;
+        var q = blocks[i] && blocks[i].querySelector('.piece-qty');
+        if (q) q.value = v;
+      });
+      origSave();
+      scheduleLive();
+    } else if (el.matches('#pieceBlocks .step-action, #holeList .hole-station')){
+      /* Onglet 1 : passer de 1 trou a 2 trous met le resultat a jour tout
+         de suite (si un changement de dimension a remis les resultats a
+         zero, rien n'est relance). */
+      scheduleLive();
+    }
+  });
+
+  function restore(){
+    // Chute de tete : toujours conservee d'une session a l'autre.
+    var savedChute = null;
+    try{ savedChute = localStorage.getItem(CHUTE_KEY); } catch(e){}
+    var chEl = document.getElementById('chutetete');
+    if (chEl && savedChute !== null && num(savedChute) !== null) chEl.value = savedChute;
+
+    var snap = readSnap();
+    lastSig = sigNow();
+    if (!snap) return;
+    var blOk = num(snap.boardlen);
+    if (snap.sig !== lastSig || blOk === null || blOk <= 0){ dropSnap(); return; }
+
+    function set(id, v, fire){
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.value = v;
+      if (fire){
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    set('kerf', snap.kerf, false);
+    set('minchute', snap.minchute, false);
+    set('boardlen', snap.boardlen, true);
+    window.wizardChosenStock = snap.chosen || null;
+
+    var stepBefore = (typeof window.wizardGetCurrentStep === 'function') ? window.wizardGetCurrentStep() : 1;
+    var origScroll = window.scrollElementToViewportFraction;
+    window.scrollElementToViewportFraction = function(){};
+    var btn = document.getElementById('calcBtn');
+    try{ if (btn) btn.click(); } catch(e){}
+    setTimeout(function(){ window.scrollElementToViewportFraction = origScroll; }, 800);
+
+    if (typeof window.wizardGoTo === 'function' && typeof window.wizardGetCurrentStep === 'function' &&
+        window.wizardGetCurrentStep() !== stepBefore){
+      window.wizardGoTo(stepBefore);
+    }
+    if (!document.querySelector('#resultsBody .diagram-wrap, #resultsBody .optimizer-panel')){
+      // Le calcul n'a pas pu etre refait : on repart proprement, sans message d'erreur au demarrage.
+      if (typeof clearError === 'function') clearError();
+      if (typeof clearWarn === 'function') clearWarn();
+      dropSnap();
+    }
+    lastSig = sigNow();
+    if (typeof window.wizardRefreshNext === 'function') window.wizardRefreshNext();
+  }
+
+  window.addEventListener('load', function(){ setTimeout(restore, 120); });
 })();
 </script>
 </body>
