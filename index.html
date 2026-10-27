@@ -12560,8 +12560,22 @@ if ('serviceWorker' in navigator) {
     try{ localStorage.removeItem(SNAP_KEY); } catch(e){}
   }
 
-  function resetResults(resetQty){
+  /* Onglet 2 (Optimisation) : propositions de palettes ecartees ou affichees.
+     Avec full = true, on remet aussi les filtres et le « nombre de fois par planche ». */
+  function resetOptimTab(full){
+    try{ stockRejectedRows = []; } catch(e){}
+    var box = document.getElementById('stockResult');
+    if (box){ box.innerHTML = ''; box.style.display = 'none'; }
+    if (full){
+      var m = document.getElementById('stockFilterMatiere'); if (m) m.value = '';
+      var d = document.getElementById('stockFilterDimension'); if (d) d.value = '';
+      var n = document.getElementById('stockMaxPieces'); if (n) n.value = 1;
+    }
+  }
+
+  function resetResults(resetQty, full){
     dropSnap();
+    resetOptimTab(full);
     if (resultsBody && emptyHtml !== null) resultsBody.innerHTML = emptyHtml;
     try{ lastPieceTypesForOptimizer = []; } catch(e){}
     if (typeof clearWarn === 'function') clearWarn();
@@ -12577,10 +12591,11 @@ if ('serviceWorker' in navigator) {
     }
     window.wizardChosenStock = null;
     if (typeof window.wizardRefreshNext === 'function') window.wizardRefreshNext();
-    if (resetQty){
-      document.querySelectorAll('#pieceBlocks .piece-qty').forEach(function(q){ q.value = 1; });
-      origSave();
-    }
+    /* Toute remise a zero (onglet 2 ou onglet 3) ramene aussi les quantites
+       cachees a 1 et vide l'optimisation 3.1 (deja effacee avec les resultats). */
+    try{ lastOptimizerBoard = 0; } catch(e){}
+    document.querySelectorAll('#pieceBlocks .piece-qty').forEach(function(q){ q.value = 1; });
+    origSave();
   }
 
   function check(userEdit){
@@ -12601,7 +12616,13 @@ if ('serviceWorker' in navigator) {
       if (!el || !el.matches) return;
       var hit = false;
       if (t === 'input' || t === 'change') hit = el.matches('.step-dist, .hole-dist, #chutetete') || (t === 'change' && el.matches('.step-action'));
-      if (t === 'click') hit = !!el.closest('#pieceBlocks .rm, #holeList .rm');
+      if (t === 'click' && el.closest('#pieceBlocks .piece-steps .rm, #holeList .rm')){
+        /* Suppression d'une ligne : remise a zero complete (optimisation
+           comprise), meme si la ligne supprimee n'influait pas sur le calcul. */
+        userFlag = true;
+        setTimeout(function(){ userFlag = false; lastSig = sigNow(); resetResults(true, true); }, 0);
+        return;
+      }
       if (hit){ userFlag = true; setTimeout(function(){ userFlag = false; }, 0); }
     }, true);
   });
@@ -12632,6 +12653,15 @@ if ('serviceWorker' in navigator) {
       check(userFlag);
     }
   });
+  var origFill = window.fillChantierForm;
+  if (typeof origFill === 'function'){
+    window.fillChantierForm = function(){
+      resetResults(true, true);
+      lastSig = sigNow();
+      return origFill.apply(this, arguments);
+    };
+  }
+
   document.addEventListener('click', function(e){
     var el = e.target;
     if (!el || !el.closest) return;
